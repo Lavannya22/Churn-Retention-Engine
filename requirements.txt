@@ -1,0 +1,2 @@
+# Dependencies added phase by phase as they're actually used.
+# Run `pip freeze > requirements.txt` to refresh once packages are installed.

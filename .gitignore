@@ -1,0 +1,19 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# Environment
+.env
+
+# Data (raw CSV is small/public and committed for portfolio visibility; processed is always regenerable)
+data/processed/*
+!data/processed/.gitkeep
+
+# Models
+models/*.pkl
+
+# OS
+.DS_Store
+Thumbs.db
