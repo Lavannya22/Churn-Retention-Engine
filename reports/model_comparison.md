@@ -56,3 +56,42 @@ recall (0.7834) and ROC-AUC (0.8437) are close enough to XGBoost's that the
 interpretability-for-accuracy trade would be cheap if it were ever needed.
 
 **xgboost.pkl is the model Phase 6's `retention_strategy.py` will load.**
+
+## Phase 6 addendum: the real operating threshold
+
+The 0.5 threshold above was always a placeholder. Phase 6 swept 91 candidate
+thresholds (0.05-0.95) against the held-out test set, scoring each by actual
+dollar business value -- not F1, not accuracy -- using CLV = monthly_charges
+x 12, a $20 retention offer cost, and a 25% offer success rate (see
+`src/retention_strategy.py` for the exact formula).
+
+**Chosen threshold: 0.09** -- far below 0.5. At this operating point:
+
+| Metric | Value |
+|---|---|
+| Precision | 0.3379 |
+| Recall | 0.9893 |
+| Confusion matrix | TN=310, FP=725, FN=4, TP=370 |
+
+**Why this makes business sense:** a wasted $20 offer (false positive) is
+cheap; a missed churner (false negative) costs their entire CLV, often
+$800-1,400. That asymmetry means it's worth flagging aggressively and
+accepting a lot of false positives to drive false negatives down to nearly
+zero (only 4 missed, out of 374 actual churners in the test set). Optimizing
+for F1 or accuracy would never find this threshold, because those metrics
+treat a $20 mistake and an $800+ mistake as equally bad -- optimizing for
+actual dollar value is what surfaces it.
+
+**Backtested business value on the test set, by threshold:**
+
+| Threshold | Business value |
+|---|---|
+| No retention program at all | -$327,684.60 |
+| Default 0.5 | -$6,246.60 |
+| **Optimal (0.09)** | **+$57,091.65** |
+
+The default 0.5 threshold is barely distinguishable from doing nothing --
+it's still a net loss, because it misses too many high-CLV churners. The
+ROI-optimized threshold doesn't just improve on that marginally: it flips
+the retention program from a net loss to a net gain of over $57K on this
+test set alone.
