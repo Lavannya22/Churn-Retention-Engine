@@ -13,13 +13,16 @@ Run after load_data.py and validation.py. Cleaning decisions made here:
   defensively (none currently exist in this dataset -- confirmed in
   validation.py).
 
-Output: data/processed/customers_clean.csv
+Output: data/processed/customers_clean.csv, plus the total_charges fix is
+also applied back to the Postgres customers table directly (Phase 3+
+query that table, not the CSV, so the fix needs to live there too).
 """
 
 import logging
 from pathlib import Path
 
 import pandas as pd
+from sqlalchemy import text
 
 from db import get_engine
 
@@ -49,6 +52,23 @@ def load_customers() -> pd.DataFrame:
     return pd.read_sql("SELECT * FROM customers", engine)
 
 
+def persist_total_charges_fix() -> None:
+    """Apply the same total_charges = 0 fix directly in Postgres.
+
+    Phase 3+ query the customers table directly, so the cleaning decision
+    made here needs to live in the database, not just in the CSV export.
+    """
+    engine = get_engine()
+    with engine.begin() as conn:
+        result = conn.execute(
+            text(
+                "UPDATE customers SET total_charges = 0 "
+                "WHERE total_charges IS NULL AND tenure_months = 0"
+            )
+        )
+        logger.info("Updated %d row(s) in Postgres customers table.", result.rowcount)
+
+
 def clean(df: pd.DataFrame) -> pd.DataFrame:
     before = len(df)
 
@@ -76,6 +96,8 @@ def main() -> None:
     OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
     df.to_csv(OUTPUT_PATH, index=False)
     logger.info("Wrote %d cleaned rows to %s", len(df), OUTPUT_PATH)
+
+    persist_total_charges_fix()
 
 
 if __name__ == "__main__":
