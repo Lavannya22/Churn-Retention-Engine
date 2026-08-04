@@ -28,6 +28,7 @@ import pandas as pd
 from sklearn.metrics import confusion_matrix, precision_score, recall_score
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from db import get_engine  # noqa: E402
 from train_model import BOOLEAN_COLUMNS, CATEGORICAL_COLUMNS, NUMERIC_COLUMNS  # noqa: E402
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -157,8 +158,19 @@ def main() -> None:
     active_df[output_cols].to_csv(RECOMMENDATIONS_PATH, index=False)
     logger.info("Wrote %d scored customers to %s", len(active_df), RECOMMENDATIONS_PATH)
 
+    persist_recommendations_to_postgres(active_df[output_cols])
+
     top_20 = active_df.sort_values("churn_probability", ascending=False).head(20)
     write_top_risk_report(top_20, optimal_threshold, action_counts, value_at_optimal, value_at_default, value_at_no_program)
+
+
+def persist_recommendations_to_postgres(recommendations: pd.DataFrame) -> None:
+    """Replace the retention_recommendations table so Power BI (Phase 7) can
+    connect directly to Postgres instead of needing a flat-file export.
+    """
+    engine = get_engine()
+    recommendations.to_sql("retention_recommendations", engine, if_exists="replace", index=False)
+    logger.info("Replaced retention_recommendations table in Postgres (%d rows)", len(recommendations))
 
 
 def write_top_risk_report(top_20, threshold, action_counts, value_optimal, value_default, value_no_program) -> None:
